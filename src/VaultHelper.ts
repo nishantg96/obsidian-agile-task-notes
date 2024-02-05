@@ -24,7 +24,7 @@ export class VaultHelper {
   public static createFolders(path: string): void {
     if (app.vault.getAbstractFileByPath(path) == null) {
       app.vault.createFolder(path)
-      .catch(err => console.log(err));
+        .catch(err => console.log(err));
     }
   }
 
@@ -43,13 +43,12 @@ export class VaultHelper {
  * @param id - The string to search for in the path folder
  * @public
  */
-  public static getFileByTaskId(path: string, id: string) : TFile | undefined {
+  public static getFileByTaskId(path: string, id: string): TFile | undefined {
     const files = app.vault.getMarkdownFiles();
 
     const projectPath = path.slice(0, path.lastIndexOf('/')); // Remove the specific sprint since files can be in old sprints
 
     for (let i = 0; i < files.length; i++) {
-
       let filePath = files[i].path
       if (filePath.startsWith(projectPath) && filePath.contains(id)) {
         return files[i];
@@ -87,14 +86,31 @@ export class VaultHelper {
     return promisesToCreateNotes;
   }
 
-   /**
-   * Builds up a markdown file that represents a Kanban board for the sprint. Utilizes the format for the Kanban plugin"
-   * @param path - The path to create each task at
-   * @param tasks - An array of Tasks
-   * @param columns - An array of column names to match state of the tasks with
-   * @param prefix - The prefix to add to the kanban board name
-   * @public
-   */
+  public static addParentPaths(path: string, tasks: Array<Task>, template: string): Promise<any>[] {
+    let promisesToCreateParents: Promise<any>[] = [];
+    tasks.forEach(task => {
+        if (this.getFileByTaskId(path, task.id) == undefined) {
+            promisesToCreateParents.push(this.addParentPath(path, task, template));
+        }
+    });
+    return promisesToCreateParents;
+  }
+
+  private static async addParentPath(path: string, task: Task, template: string): Promise<any> {
+      const parentPath = task.parent ? VaultHelper.getFileByTaskId(path, task.parent) : undefined;
+      console.log(parentPath);
+      // You can return a resolved promise here if needed
+      return Promise.resolve(parentPath);
+  }
+
+  /**
+  * Builds up a markdown file that represents a Kanban board for the sprint. Utilizes the format for the Kanban plugin"
+  * @param path - The path to create each task at
+  * @param tasks - An array of Tasks
+  * @param columns - An array of column names to match state of the tasks with
+  * @param prefix - The prefix to add to the kanban board name
+  * @public
+  */
   public static createKanbanBoard(path: string, tasks: Array<Task>, columns: Array<string>, prefix: string, teamLeaderMode: boolean): Promise<void> {
     const filename = `${prefix}-Board`;
     const filepath = path + `/${filename}.md`;
@@ -130,24 +146,24 @@ export class VaultHelper {
     return app.vault.adapter.write(filepath, boardMD);
   }
 
-  private static async createTaskNote(path: string, task: Task, template:string): Promise<TFile> {
+  private static async createTaskNote(path: string, task: Task, template: string): Promise<TFile> {
     const filename = VaultHelper.formatTaskFilename(task.type, task.id);
     const filepath = path + `/${filename}.md`;
 
     let content = template
-            .replace(/{{TASK_ID}}/g, task.id)
-            .replace(/{{TASK_TITLE}}/g, task.title)
-            .replace(/{{TASK_STATE}}/g, task.state)
-            .replace(/{{TASK_TYPE}}/g, task.type.replace(/ /g,''))
-            .replace(/{{TASK_ASSIGNEDTO}}/g, task.assignedTo)
-            .replace(/{{TASK_LINK}}/g, task.link);
+      .replace(/{{TASK_ID}}/g, task.id)
+      .replace(/{{TASK_TITLE}}/g, task.title)
+      .replace(/{{TASK_STATE}}/g, task.state)
+      .replace(/{{TASK_TYPE}}/g, task.type.replace(/ /g, ''))
+      .replace(/{{TASK_ASSIGNEDTO}}/g, task.assignedTo)
+      .replace(/{{TASK_LINK}}/g, task.link);
 
     if (task.dueDate != null) {
       content = content.replace(/{{TASK_DUEDATE}}/g, task.dueDate);
     } else {
       content = content.replace(/{{TASK_DUEDATE}}/g, '');
     }
-            
+
     if (task.tags != null) {
       content = content.replace(/{{TASK_TAGS}}/g, task.tags);
     } else {

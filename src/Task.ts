@@ -1,3 +1,7 @@
+export interface Parent {
+  type: string;
+  id: string;
+}
 
 /**
    * Simple data class that allows for generalization of a task from any TFS
@@ -16,8 +20,9 @@ export class Task {
   public testScenarios?: string;
   public dueDate?: string;
   public tags?: string;
+  public parent?: string;
 
-  constructor(id: string, state: string, title: string, type: string, assignedTo: string, link: string, desc: string, criteria?: string, testScenarios?: string, dueDate?: string, tags?: string) {
+  constructor(id: string, state: string, title: string, type: string, assignedTo: string, link: string, desc: string, criteria?: string, testScenarios?: string, dueDate?: string, tags?: string, parent?: string) {
     this.id = id;
     this.state = state;
     this.title = title;
@@ -29,5 +34,6 @@ export class Task {
     this.testScenarios = testScenarios;
     this.dueDate = dueDate;
     this.tags = tags;
+    this.parent = parent;
   }
 }

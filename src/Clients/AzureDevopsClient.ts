@@ -2,7 +2,7 @@ import AgileTaskNotesPlugin, { AgileTaskNotesPluginSettingTab, AgileTaskNotesSet
 import { normalizePath, requestUrl, Setting } from 'obsidian';
 import { VaultHelper } from 'src/VaultHelper'
 import { ITfsClient } from './ITfsClient';
-import { Task } from 'src/Task';
+import { Task, Parent } from 'src/Task';
 
 export interface AzureDevopsSettings {
   instance: string,
@@ -52,7 +52,7 @@ export class AzureDevopsClient implements ITfsClient{
       );
       const currentSprint = iterationResponse.json.value[0];
       const normalizeIterationPath = currentSprint.path.normalize().replace(/\\/g, '\\\\');
-      
+
       var taskIds:any;
 
       if (settings.teamLeaderMode) {
@@ -106,7 +106,7 @@ export class AzureDevopsClient implements ITfsClient{
         { 
           method: 'GET', 
           headers: headers, 
-          url: task.url
+          url: task.url + "?api-version=6.0&$expand=relations"
         }).then((r) => r.json)));
       
       let tasks:Array<Task> = [];
@@ -118,9 +118,16 @@ export class AzureDevopsClient implements ITfsClient{
           assigneeName = assignee["displayName"];
         }
 
-        let tags = task.fields["System.Tags"] ? task.fields["System.Tags"] : "";
-        let replacedTags = tags && /\w+ \w+/.test(tags) ? tags.replace(/; (\w+) (\w+)(?=;|$)/g, '; $1-$2').replace(/;/g, "") : tags;
-        
+        let tags = task.fields["System.Tags"] || "";
+        let replacedTags = tags.split(';')
+                                .map((part: string) => part.trim()
+                                    .split(' ')
+                                    .map(word => word.replace(/\s+/g, '-'))
+                                    .join('-'))
+                                .filter(Boolean)
+                                .join(' ');
+
+
         const tempDate = new Date(task.fields["Microsoft.VSTS.Scheduling.DueDate"])
         const dueDate = tempDate && !isNaN(tempDate.getTime()) ? tempDate.toLocaleDateString("en-GB") : "";
 
@@ -139,13 +146,18 @@ export class AzureDevopsClient implements ITfsClient{
           acceptanceCriteria,
           testScenarios,
           dueDate,
-          replacedTags));
+          replacedTags,
+          task.fields["System.Parent"]));
       });
 
-      // Create markdown files based on remote task in current sprint
+      // Await createTaskNotes separately
       await Promise.all(VaultHelper.createTaskNotes(normalizedFolderPath, tasks, settings.noteTemplate))
-        .catch(e => VaultHelper.logError(e));
-      
+          .catch(e => VaultHelper.logError(e));
+
+      // Proceed with addParentPaths
+      await Promise.all(VaultHelper.addParentPaths(normalizedFolderPath, tasks, settings.noteTemplate))
+          .catch(e => VaultHelper.logError(e));
+        
       if (settings.createKanban) {
         
         // Create or replace Kanban board of current sprint
